@@ -8,6 +8,7 @@ using Topshelf;
 using LuceneServer.Services;
 using LuceneServer.Filters;
 using System.Configuration;
+using log4net;
 using NetworkSocket.Exceptions;
 namespace LuceneServer
 {
@@ -16,12 +17,14 @@ namespace LuceneServer
     /// </summary>
     internal class LnServer : FastTcpServer, ServiceControl
     {
-        /// <summary>
-        /// 关闭非法连接的用户
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="exception"></param>
-        protected override void OnException(object sender, Exception exception)
+		readonly ILog _log = LogManager.GetLogger(typeof(LnServer));
+
+		/// <summary>
+		/// 关闭非法连接的用户
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="exception"></param>
+		protected override void OnException(object sender, Exception exception)
         {
             if (exception is ProtocolException)
             {
@@ -37,9 +40,12 @@ namespace LuceneServer
         /// <returns></returns>
         public bool Start(Topshelf.HostControl hostControl)
         {
-            this.GlobalFilters.Add(new ExceptionFilter());
+	        var port = int.Parse(ConfigurationManager.AppSettings["Port"]);
+			
+			this.GlobalFilters.Add(new ExceptionFilter());
             this.BindService<LnService>().BindService<SystemService>();
-            this.StartListen(int.Parse(ConfigurationManager.AppSettings["Port"]));
+            this.StartListen(port);
+			_log.Info($"Service started, listen at {port}");
             return true;
         }
 
@@ -50,7 +56,8 @@ namespace LuceneServer
         /// <returns></returns>
         public bool Stop(Topshelf.HostControl hostControl)
         {
-            this.Dispose();
+			_log.Info("Service stopped");
+			this.Dispose();
             return true;
         }
     }

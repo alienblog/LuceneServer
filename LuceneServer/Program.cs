@@ -4,6 +4,8 @@ using System.Linq;
 using System.Text;
 using NetworkSocket.Fast;
 using System.Configuration;
+using System.IO;
+using log4net.Config;
 using LuceneServer.Filters;
 using LuceneServer.Services;
 using Topshelf;
@@ -14,7 +16,10 @@ namespace LuceneServer
     {
         static void Main(string[] args)
         {
-            HostFactory.Run(c =>
+			var logCfg = new FileInfo(AppDomain.CurrentDomain.BaseDirectory + "log4net.config");
+			XmlConfigurator.ConfigureAndWatch(logCfg);
+
+			HostFactory.Run(c =>
             {
                 c.Service<LnServer>();
                 c.RunAsLocalSystem();

@@ -41,21 +41,31 @@ namespace LuceneServer
 			return (Size);
 		}
 
-		public static string GetLastIndexDir(string indexName)
+		/// <summary>
+		/// 获取最新索引目录
+		/// </summary>
+		/// <param name="indexName">索引名称</param>
+		/// <param name="needCompressionIndexDirPath">需要压缩的目录</param>
+		/// <returns></returns>
+		public static string GetLastIndexDir(string indexName, out string needCompressionIndexDirPath)
 		{
+			needCompressionIndexDirPath = string.Empty;
 			var rootDir = new DirectoryInfo(Path.Combine(IndexRootDir, indexName));
 			if (!rootDir.Exists)
 			{
 				rootDir.Create();
 			}
 			var subDirs = rootDir.GetDirectories();
-			var index = subDirs.Length;
+			var index = Math.Max(subDirs.Length - 1, 0);
 			var indexDirPath = Path.Combine(IndexRootDir, indexName, index.ToString());
-			if (Directory.Exists(indexDirPath))
+			if (File.Exists(Path.Combine(indexDirPath, "segments.gen")))
 			{
 				var dirSize = (int)(GetDirSize(new DirectoryInfo(indexDirPath)) / 1024 / 1024);
 				if (dirSize >= _maxDirSize)
+				{
+					needCompressionIndexDirPath = indexDirPath;
 					indexDirPath = Path.Combine(IndexRootDir, indexName, (index + 1).ToString());
+				}
 			}
 			return indexDirPath;
 		}
@@ -67,6 +77,26 @@ namespace LuceneServer
 
 			var subDirs = rootDir.GetDirectories();
 			return subDirs.Any(subDir => File.Exists(Path.Combine(subDir.FullName, "segments.gen")));
+		}
+
+		public static bool LastDirExistsIndex(string indexName)
+		{
+			var rootDir = new DirectoryInfo(Path.Combine(IndexRootDir, indexName));
+			if (!rootDir.Exists) return false;
+
+			var subDirs = rootDir.GetDirectories();
+			var index = Math.Max(subDirs.Length - 1, 0);
+			var indexDirPath = Path.Combine(IndexRootDir, indexName, index.ToString());
+			if (File.Exists(Path.Combine(indexDirPath, "segments.gen")))
+			{
+				var dirSize = (int)(GetDirSize(new DirectoryInfo(indexDirPath)) / 1024 / 1024);
+				if (dirSize >= _maxDirSize)
+				{
+					indexDirPath = Path.Combine(IndexRootDir, indexName, (index + 1).ToString());
+				}
+			}
+			
+			return subDirs.Any(subDir => File.Exists(Path.Combine(indexDirPath, "segments.gen")));
 		}
 
 		public static string[] GetAllIndexDir(string indexName)
