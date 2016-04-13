@@ -42,7 +42,7 @@ namespace LuceneServer
         /// <returns></returns>
         private static bool ExistsIndex(string indexName)
         {
-            return System.IO.File.Exists(System.IO.Path.Combine("Indexs/" + indexName, "segments.gen"));
+	        return LnFileHelper.ExistsIndex(indexName);
         }
 
         /// <summary>
@@ -54,12 +54,31 @@ namespace LuceneServer
         {
             return _indexStores.GetOrAdd(indexName, (key) =>
             {
-                var indexPath = "Indexs/" + key;
+                //var indexPath = "Indexs/" + key;
+	            var indexPath = LnFileHelper.GetLastIndexDir(key);
                 System.IO.Directory.CreateDirectory(indexPath);
                 var dirInfo = new System.IO.DirectoryInfo(indexPath);
                 return FSDirectory.Open(dirInfo);
             });
         }
+
+	    private static Directory[] GetIndexStores(string indexName)
+	    {
+		    var indexPaths = LnFileHelper.GetAllIndexDir(indexName);
+		    var dirs = new List<Directory>();
+		    foreach (var indexPath in indexPaths)
+		    {
+			    var indexStore = _indexStores.GetOrAdd(indexName, (key) =>
+			    {
+				    //var indexPath = "Indexs/" + key;
+				    System.IO.Directory.CreateDirectory(indexPath);
+				    var dirInfo = new System.IO.DirectoryInfo(indexPath);
+				    return FSDirectory.Open(dirInfo);
+			    });
+				dirs.Add(indexStore);
+		    }
+		    return dirs.ToArray();
+	    }
 
         /// <summary>
         /// 提供安全执行Reader操作
@@ -70,11 +89,17 @@ namespace LuceneServer
         /// <returns></returns>
         private static T InvokeReaderNoLock<T>(string indexName, Func<IndexReader, T> func)
         {
-            var indexStore = GetIndexStore(indexName);
-            using (var reader = IndexReader.Open(indexStore, true))
-            {
-                return func(reader);
-            }
+            var indexStores = GetIndexStores(indexName);
+	        var readers = new List<IndexReader>();
+	        try
+	        {
+		        readers.AddRange(indexStores.Select(indexStore => IndexReader.Open(indexStore, true)));
+		        return func(new MultiReader(readers.ToArray()));
+	        }
+	        finally
+	        {
+		        readers.ForEach(x => x.Dispose());
+	        }
         }
 
         /// <summary>
